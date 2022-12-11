@@ -1,3 +1,7 @@
+use std::sync::Arc;
+
+use ethers::providers::{JsonRpcClient, Middleware, Provider};
+use futures::FutureExt;
 use reth_primitives::{
     FromRecoveredTransaction, IntoRecoveredTransaction, TransactionSignedEcRecovered, U256
 };
@@ -5,6 +9,7 @@ use reth_transaction_pool::{
     PoolTransaction, TransactionOrdering, TransactionOrigin, TransactionValidationOutcome,
     TransactionValidator
 };
+use tokio::join;
 pub struct BasicOrdering;
 
 #[derive(Debug)]
@@ -114,23 +119,47 @@ impl TransactionOrdering for BasicOrdering
     }
 }
 
-pub struct NonValidator;
+pub struct NonValidator<P: JsonRpcClient>
+{
+    provider: Arc<Provider<P>>
+}
+
+impl<P: JsonRpcClient> NonValidator<P>
+{
+    pub fn new(provider: Arc<Provider<P>>) -> Self
+    {
+        Self { provider }
+    }
+}
 
 #[async_trait::async_trait]
-impl TransactionValidator for NonValidator
+/// reth verifies the signature of the transaction for us so we will always know
+/// that it is a valid transaction
+impl<P: JsonRpcClient + 'static> TransactionValidator for NonValidator<P>
 {
     type Transaction = TxPoolTx;
 
     async fn validate_transaction(
         &self,
-        origin: TransactionOrigin,
-        _transaction: Self::Transaction
+        _origin: TransactionOrigin,
+        tx: Self::Transaction
     ) -> TransactionValidationOutcome<Self::Transaction>
     {
-        match origin
-        {
-            TransactionOrigin::Local => todo!(),
-            TransactionOrigin::External => todo!()
+        // get sender nonce
+        let nonce = self
+            .provider
+            .get_transaction_count(tx.sender(), None)
+            .map(|f| f.map(|t| t.as_u64()));
+        let balance = self.provider.get_balance(tx.sender(), None);
+
+        let (Ok(nonce), Ok(bal)) = join!(nonce, balance) else {
+            panic!("failed to get info");
+        };
+
+        TransactionValidationOutcome::Valid {
+            balance:     bal,
+            state_nonce: nonce,
+            transaction: tx
         }
     }
 }

@@ -163,7 +163,13 @@ impl<P: JsonRpcClient> BlockProvider for BlockClient<P>
                             reth_provider::Error::BlockNumberNotExists { block_number: 0 }
                         )
                     })?
-                    .remove(0);
+                    .get(0)
+                    .ok_or_else(|| {
+                        reth_interfaces::Error::Provider(
+                            reth_provider::Error::BlockNumberNotExists { block_number: 0 }
+                        )
+                    })?
+                    .clone();
 
                 let header = self.build_header(block)?;
                 let block =
