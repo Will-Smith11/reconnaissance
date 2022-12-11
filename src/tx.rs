@@ -89,24 +89,16 @@ impl TransactionOrdering for BasicOrdering
 
 pub struct NonValidator;
 
+#[async_trait::async_trait]
 impl TransactionValidator for NonValidator
 {
     type Transaction = TxPoolTx;
 
-    fn validate_transaction<'life0, 'async_trait>(
-        &'life0 self,
+    async fn validate_transaction(
+        &self,
         origin: TransactionOrigin,
         _transaction: Self::Transaction
-    ) -> core::pin::Pin<
-        Box<
-            dyn core::future::Future<Output = TransactionValidationOutcome<Self::Transaction>>
-                + core::marker::Send
-                + 'async_trait
-        >
-    >
-    where
-        'life0: 'async_trait,
-        Self: 'async_trait
+    ) -> TransactionValidationOutcome<Self::Transaction>
     {
         todo!()
     }

@@ -4,55 +4,28 @@ use ethers::{
     providers::{JsonRpcClient, Middleware, Provider},
     types::{BlockId, BlockNumber}
 };
+use futures::future::join_all;
+use reth_network::FetchClient;
+use reth_primitives::Header;
 use reth_provider::{BlockProvider, ChainInfo, HeaderProvider};
 use tokio::{join, runtime::Handle};
 
-/// takes any value and cycles through them
-pub struct Cycler<T>
-{
-    inner: Vec<T>,
-    ptr:   AtomicUsize,
-    max:   usize
-}
-impl<T> Cycler<T>
-{
-    pub fn new(inner: Vec<T>) -> Self
-    {
-        let ptr = AtomicUsize::new(0);
-        let max = inner.len();
-        Cycler { inner, ptr, max }
-    }
-
-    pub fn get(&self) -> &T
-    {
-        let ptr = if self.ptr.load(std::sync::atomic::Ordering::SeqCst) == self.max
-        {
-            self.ptr.store(0, std::sync::atomic::Ordering::SeqCst);
-            0
-        }
-        else
-        {
-            self.ptr.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
-        };
-        self.inner.get(ptr).unwrap()
-    }
-}
 /// bit jank because the blockProvider api isn't async
-pub struct BlockClient<P: JsonRpcClient>
+pub struct BlockClient
 {
     // different clients to delegate calls to
-    inner: Cycler<Arc<Provider<P>>>
+    fetcher: FetchClient
 }
 
-impl<P: JsonRpcClient> BlockClient<P>
+impl BlockClient
 {
-    pub fn new(inner: Cycler<Arc<Provider<P>>>) -> Self
+    pub fn new(fetcher: FetchClient) -> Self
     {
-        Self { inner }
+        Self { fetcher }
     }
 }
 
-impl<P: JsonRpcClient> BlockProvider for BlockClient<P>
+impl BlockProvider for BlockClient
 {
     fn chain_info(&self) -> reth_interfaces::Result<reth_provider::ChainInfo>
     {
@@ -98,8 +71,41 @@ impl<P: JsonRpcClient> BlockProvider for BlockClient<P>
     {
         tokio::task::block_in_place(|| {
             Handle::current().block_on(async {
-                // Todo: will most likely have to manually request this one
-                Ok(None)
+                let block = self.inner.get().get_block(id).await.unwrap().unwrap();
+
+                let header = Header {
+                    parent_hash:       block.parent_hash,
+                    ommers_hash:       block.uncles_hash,
+                    beneficiary:       block.author.unwrap(),
+                    state_root:        block.state_root,
+                    transactions_root: block.transactions_root,
+                    receipts_root:     block.receipts_root,
+                    logs_bloom:        block.logs_bloom.unwrap(),
+                    difficulty:        block.difficulty,
+                    number:            block.number.unwrap().as_u64(),
+                    gas_limit:         block.gas_limit.as_u64(),
+                    gas_used:          block.gas_used.as_u64(),
+                    timestamp:         block.timestamp.as_u64(),
+                    mix_hash:          block.mix_hash.unwrap(),
+                    nonce:             block.nonce.unwrap().to_low_u64_be(),
+                    base_fee_per_gas:  block.base_fee_per_gas.map(|f| f.as_u64()),
+                    extra_data:        block.extra_data.0
+                };
+
+                // self.inner.get().get_uncle(block_hash_or_number, idx)
+
+                let futs = join_all(
+                    block
+                        .transactions
+                        .into_iter()
+                        .map(|tx| self.inner.get().get_transaction(tx))
+                )
+                .await
+                .into_iter()
+                .map(|res| {});
+
+                Ok(Some(reth_primitives::Block { header, body: todo!(), ommers: todo!() }))
+                // Ok(None)
             })
         })
     }
@@ -143,7 +149,7 @@ impl<P: JsonRpcClient> BlockProvider for BlockClient<P>
     }
 }
 
-impl<P: JsonRpcClient> HeaderProvider for BlockClient<P>
+impl HeaderProvider for BlockClient
 {
     fn header(
         &self,

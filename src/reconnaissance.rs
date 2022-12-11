@@ -26,7 +26,7 @@ pub struct Reconnaissance
 
 impl Reconnaissance
 {
-    pub async fn new<P: JsonRpcClient + 'static>(client: Arc<BlockClient<P>>) -> Self
+    pub async fn new(client: Arc<BlockClient>) -> Self
     {
         let secret_key = SecretKey::new(&mut rand::thread_rng());
         let network_config = NetworkConfig::builder(client.clone(), secret_key).build();

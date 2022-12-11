@@ -1,3 +1,3 @@
 mod block_client;
-mod reconnaissance;
+pub mod reconnaissance;
 mod tx;
