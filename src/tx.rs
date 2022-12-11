@@ -1,4 +1,6 @@
-use reth_primitives::{FromRecoveredTransaction, TransactionSignedEcRecovered};
+use reth_primitives::{
+    FromRecoveredTransaction, IntoRecoveredTransaction, TransactionSignedEcRecovered
+};
 use reth_transaction_pool::{
     PoolTransaction, TransactionOrdering, TransactionOrigin, TransactionValidationOutcome,
     TransactionValidator
@@ -16,6 +18,13 @@ impl FromRecoveredTransaction for TxPoolTx
     fn from_recovered_transaction(tx: TransactionSignedEcRecovered) -> Self
     {
         Self { inner: tx }
+    }
+}
+impl IntoRecoveredTransaction for TxPoolTx
+{
+    fn to_recovered_transaction(&self) -> TransactionSignedEcRecovered
+    {
+        self.inner.clone()
     }
 }
 

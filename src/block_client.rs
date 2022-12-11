@@ -4,7 +4,7 @@ use ethers::{
     providers::{JsonRpcClient, Middleware, Provider},
     types::{BlockId, BlockNumber}
 };
-use reth_provider::{BlockProvider, ChainInfo};
+use reth_provider::{BlockProvider, ChainInfo, HeaderProvider};
 use tokio::{join, runtime::Handle};
 
 /// takes any value and cycles through them
@@ -16,7 +16,14 @@ pub struct Cycler<T>
 }
 impl<T> Cycler<T>
 {
-    pub fn get(&self) -> Option<&T>
+    pub fn new(inner: Vec<T>) -> Self
+    {
+        let ptr = AtomicUsize::new(0);
+        let max = inner.len();
+        Cycler { inner, ptr, max }
+    }
+
+    pub fn get(&self) -> &T
     {
         let ptr = if self.ptr.load(std::sync::atomic::Ordering::SeqCst) == self.max
         {
@@ -27,14 +34,22 @@ impl<T> Cycler<T>
         {
             self.ptr.fetch_add(1, std::sync::atomic::Ordering::SeqCst)
         };
-        self.inner.get(ptr)
+        self.inner.get(ptr).unwrap()
     }
 }
 /// bit jank because the blockProvider api isn't async
 pub struct BlockClient<P: JsonRpcClient>
 {
-    // different clients to delgate calls to
+    // different clients to delegate calls to
     inner: Cycler<Arc<Provider<P>>>
+}
+
+impl<P: JsonRpcClient> BlockClient<P>
+{
+    pub fn new(inner: Cycler<Arc<Provider<P>>>) -> Self
+    {
+        Self { inner }
+    }
 }
 
 impl<P: JsonRpcClient> BlockProvider for BlockClient<P>
@@ -46,17 +61,14 @@ impl<P: JsonRpcClient> BlockProvider for BlockClient<P>
                 let latest = self
                     .inner
                     .get()
-                    .unwrap()
                     .get_block(BlockId::Number(BlockNumber::Latest));
                 let finalized = self
                     .inner
                     .get()
-                    .unwrap()
                     .get_block(BlockId::Number(BlockNumber::Finalized));
                 let safe = self
                     .inner
                     .get()
-                    .unwrap()
                     .get_block(BlockId::Number(BlockNumber::Safe));
                 let (latest, finalized, safe) = join!(latest, finalized, safe);
 
@@ -86,23 +98,8 @@ impl<P: JsonRpcClient> BlockProvider for BlockClient<P>
     {
         tokio::task::block_in_place(|| {
             Handle::current().block_on(async {
-                let err = || reth_interfaces::Error::Database(reth_interfaces::db::Error::Read(69));
-                let block = self
-                    .inner
-                    .get()
-                    .unwrap()
-                    .get_block(id)
-                    .await
-                    .map_err(|_| {
-                        reth_interfaces::Error::Database(reth_interfaces::db::Error::Read(69))
-                    })?
-                    .ok_or_else(err)?;
-
-                Ok(Some(reth_primitives::Block {
-                    header: todo!(),
-                    body:   todo!(),
-                    ommers: todo!()
-                }))
+                // Todo: will most likely have to manually request this one
+                Ok(None)
             })
         })
     }
@@ -113,13 +110,8 @@ impl<P: JsonRpcClient> BlockProvider for BlockClient<P>
     ) -> reth_interfaces::Result<Option<reth_primitives::BlockNumber>>
     {
         tokio::task::block_in_place(|| {
-            Handle::current().block_on(async {
-                self.inner
-                    .get()
-                    .unwrap()
-                    .get_block(BlockId::Hash(hash))
-                    .await
-            })
+            Handle::current()
+                .block_on(async { self.inner.get().get_block(BlockId::Hash(hash)).await })
         })
         .map(|block| block.map(|block_inner| block_inner.number.unwrap().as_u64()))
         .map_err(|_| {
@@ -138,7 +130,6 @@ impl<P: JsonRpcClient> BlockProvider for BlockClient<P>
             Handle::current().block_on(async {
                 self.inner
                     .get()
-                    .unwrap()
                     .get_block(BlockId::Number(BlockNumber::Number(number.as_u64().into())))
                     .await
             })
@@ -149,5 +140,22 @@ impl<P: JsonRpcClient> BlockProvider for BlockClient<P>
                 block_number: number.as_u64()
             })
         })
+    }
+}
+
+impl<P: JsonRpcClient> HeaderProvider for BlockClient<P>
+{
+    fn header(
+        &self,
+        block_hash: &reth_primitives::BlockHash
+    ) -> reth_interfaces::Result<Option<reth_primitives::Header>>
+    {
+        todo!()
+    }
+
+    fn header_by_number(&self, num: u64)
+        -> reth_interfaces::Result<Option<reth_primitives::Header>>
+    {
+        todo!()
     }
 }
