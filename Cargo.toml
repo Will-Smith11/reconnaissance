@@ -14,4 +14,4 @@ reth-interfaces = {git = "https://github.com/Will-Smith11/reth.git"}
 tokio = {version = "1.23.0", features = ["full"]}
 
 futures = "0.3.25"
-ethers = "1.0.2"
+ethers =  { git = "https://github.com/gakonst/ethers-rs"}
