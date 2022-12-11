@@ -155,25 +155,23 @@ impl<P: JsonRpcClient> BlockProvider for BlockClient<P>
                 self.fetcher
                     .send(FetcherReq::BlockBodyReq((send, vec![block.hash.unwrap()])))
                     .unwrap();
-                let body = recv
-                    .await
-                    .unwrap()
-                    .map_err(|_| {
-                        reth_interfaces::Error::Provider(
-                            reth_provider::Error::BlockNumberNotExists { block_number: 0 }
-                        )
-                    })?
-                    .get(0)
-                    .ok_or_else(|| {
-                        reth_interfaces::Error::Provider(
-                            reth_provider::Error::BlockNumberNotExists { block_number: 0 }
-                        )
-                    })?
-                    .clone();
+
+                let mut body = recv.await.unwrap().map_err(|_| {
+                    reth_interfaces::Error::Provider(reth_provider::Error::BlockNumberNotExists {
+                        block_number: 0
+                    })
+                })?;
+                if body.is_empty()
+                {
+                    return Err(reth_interfaces::Error::Provider(
+                        reth_provider::Error::BlockNumberNotExists { block_number: 0 }
+                    ))
+                }
+                let res = body.remove(0);
 
                 let header = self.build_header(block)?;
                 let block =
-                    reth_primitives::Block { header, body: body.transactions, ommers: body.ommers };
+                    reth_primitives::Block { header, body: res.transactions, ommers: res.ommers };
 
                 Ok(Some(block))
             })
