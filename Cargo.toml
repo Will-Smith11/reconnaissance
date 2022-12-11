@@ -12,6 +12,7 @@ reth-primitives = {git = "https://github.com/Will-Smith11/reth.git"}
 reth-provider = {git = "https://github.com/Will-Smith11/reth.git"}
 reth-interfaces = {git = "https://github.com/Will-Smith11/reth.git"}
 reth-eth-wire = {git = "https://github.com/Will-Smith11/reth.git"}
+reth-discv4 = {git = "https://github.com/Will-Smith11/reth.git"}
 tokio = {version = "1.23.0", features = ["full"]}
 
 futures = "0.3.25"

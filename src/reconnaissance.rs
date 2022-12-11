@@ -1,12 +1,20 @@
-use std::{sync::Arc, task::Poll, time::Duration};
+use std::{
+    net::{SocketAddr, SocketAddrV4},
+    str::FromStr,
+    sync::Arc,
+    task::Poll,
+    time::Duration
+};
 
 use ethers::providers::{Http, Provider};
 use futures::{stream::FuturesUnordered, Future, FutureExt, StreamExt};
+use reth_discv4::NodeRecord;
 use reth_interfaces::p2p::bodies::client::BodiesClient;
 use reth_network::{
     eth_requests::EthRequestHandler, transactions::TransactionsManager, NetworkConfig,
     NetworkHandle, NetworkManager
 };
+use reth_primitives::H512;
 use reth_transaction_pool::{Pool, PoolConfig};
 use secp256k1::SecretKey;
 use tokio::{
@@ -20,11 +28,6 @@ use crate::{
     tx::{BasicOrdering, NonValidator}
 };
 
-pub fn get_cycler() -> Cycler<Arc<Provider<Http>>>
-{
-    let provider = Provider::<Http>::try_from("").unwrap();
-    Cycler::new(vec![provider.into()])
-}
 /// handles all of our forwarding
 pub struct Reconnaissance
 {
@@ -39,11 +42,24 @@ impl Reconnaissance
 {
     pub async fn new() -> Self
     {
+        let ip = "34.206.90.238:48308";
+        let id = H512::from_str("59866ac8bc3308a21f2051f9f4e372617fa728b47f09fe627e7fb960f572abba64529501304ebf93b0e77b4f9010b23288bf0fa08afca595dda63854d6daea8e").unwrap();
+        let ip_addr = SocketAddr::V4(SocketAddrV4::from_str(ip).unwrap());
+        let node_record = NodeRecord {
+            address: ip_addr.ip(),
+            tcp_port: ip_addr.port(),
+            udp_port: ip_addr.port(),
+            id
+        };
         let (client_sender, client_recv) = unbounded_channel();
-        let client = Arc::new(BlockClient::new(get_cycler(), client_sender));
+        let provider = Provider::<Http>::try_from("https://rpc.ankr.com/eth").unwrap();
+        let cycler = Cycler::new(vec![provider.into()]);
+        let client = Arc::new(BlockClient::new(cycler, client_sender));
 
         let secret_key = SecretKey::new(&mut rand::thread_rng());
-        let network_config = NetworkConfig::builder(client.clone(), secret_key).build();
+        let network_config = NetworkConfig::builder(client.clone(), secret_key)
+            .boot_nodes(vec![node_record])
+            .build();
 
         let mut network_mng = NetworkManager::new(network_config).await.unwrap();
 
@@ -72,7 +88,7 @@ impl Reconnaissance
         Self {
             handles: vec![network_task, transaction_task, eth_req_handler],
             network_handle,
-            stats_interval: tokio::time::interval(Duration::from_secs(10)),
+            stats_interval: tokio::time::interval(Duration::from_secs(3)),
             client_event: client_recv,
             pending_tasks: FuturesUnordered::default()
         }
@@ -110,7 +126,8 @@ impl Future for Reconnaissance
                     }
                 }
             }
-            Poll::Pending => todo!()
+            Poll::Pending =>
+            {}
         }
 
         // poll all pending tasks
