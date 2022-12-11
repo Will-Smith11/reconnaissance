@@ -1,16 +1,18 @@
 use std::sync::{atomic::AtomicUsize, Arc};
 
 use ethers::{
-    prelude::k256::sha2::digest::typenum::private::IsEqualPrivate,
     providers::{JsonRpcClient, Middleware, Provider},
     types::{BlockId, BlockNumber}
 };
-use futures::future::join_all;
-use reth_interfaces::p2p::{bodies::client::BodiesClient, headers::client::HeadersClient};
-use reth_network::FetchClient;
+use reth_eth_wire::BlockBody;
+use reth_interfaces::p2p::error::RequestResult;
 use reth_primitives::{Header, TxHash, H256};
 use reth_provider::{BlockProvider, ChainInfo, HeaderProvider};
-use tokio::{join, runtime::Handle};
+use tokio::{
+    join,
+    runtime::Handle,
+    sync::{mpsc::UnboundedSender, oneshot}
+};
 /// takes any value and cycles through them
 pub struct Cycler<T>
 {
@@ -47,12 +49,18 @@ pub struct BlockClient<P: JsonRpcClient>
 {
     // different clients to delegate calls to
     provider: Cycler<Arc<Provider<P>>>,
-    fetcher:  FetchClient
+    fetcher:  UnboundedSender<FetcherReq>
+}
+
+#[derive(Debug)]
+pub enum FetcherReq
+{
+    BlockBodyReq((oneshot::Sender<RequestResult<Vec<BlockBody>>>, Vec<H256>))
 }
 
 impl<P: JsonRpcClient> BlockClient<P>
 {
-    pub fn new(inner: Cycler<Arc<Provider<P>>>, fetcher: FetchClient) -> Self
+    pub fn new(inner: Cycler<Arc<Provider<P>>>, fetcher: UnboundedSender<FetcherReq>) -> Self
     {
         Self { provider: inner, fetcher }
     }
@@ -143,11 +151,13 @@ impl<P: JsonRpcClient> BlockProvider for BlockClient<P>
                         block_number: 0
                     })
                 })?;
-
-                let body = self
-                    .fetcher
-                    .get_block_body(vec![block.hash.unwrap()])
+                let (send, recv) = tokio::sync::oneshot::channel();
+                self.fetcher
+                    .send(FetcherReq::BlockBodyReq((send, vec![block.hash.unwrap()])))
+                    .unwrap();
+                let body = recv
                     .await
+                    .unwrap()
                     .map_err(|_| {
                         reth_interfaces::Error::Provider(
                             reth_provider::Error::BlockNumberNotExists { block_number: 0 }
