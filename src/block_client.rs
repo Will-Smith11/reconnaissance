@@ -23,13 +23,13 @@ impl<T> Cycler<T>
     pub fn new(inner: Vec<T>) -> Self
     {
         let ptr = AtomicUsize::new(0);
-        let max = inner.len();
+        let max = inner.len() - 1;
         Cycler { inner, ptr, max }
     }
 
     pub fn get(&self) -> &T
     {
-        let ptr = if self.ptr.load(std::sync::atomic::Ordering::SeqCst) == self.max
+        let ptr = if self.ptr.load(std::sync::atomic::Ordering::SeqCst) >= self.max
         {
             self.ptr.store(0, std::sync::atomic::Ordering::SeqCst);
             0
