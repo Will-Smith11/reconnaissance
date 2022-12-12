@@ -8,6 +8,7 @@ use reth_eth_wire::BlockBody;
 use reth_interfaces::p2p::error::RequestResult;
 use reth_primitives::{Header, TxHash, H256};
 use reth_provider::{BlockProvider, ChainInfo, HeaderProvider};
+use reth_tracing::tracing::debug;
 use tokio::{
     join,
     runtime::Handle,
@@ -128,7 +129,7 @@ impl<P: JsonRpcClient> BlockProvider for BlockClient<P>
                 let latest_block = latest.map_err(take_err)?.ok_or_else(err)?;
                 let safe_block = safe.map_err(take_err)?.ok_or_else(err)?;
                 let finalized_block = finalized.map_err(take_err)?.ok_or_else(err)?;
-
+                debug!("chain info call success");
                 Ok(ChainInfo {
                     best_hash:      latest_block.hash.unwrap(),
                     best_number:    latest_block.number.unwrap().as_u64(),
@@ -172,6 +173,7 @@ impl<P: JsonRpcClient> BlockProvider for BlockClient<P>
                 let header = self.build_header(block)?;
                 let block =
                     reth_primitives::Block { header, body: res.transactions, ommers: res.ommers };
+                debug!("block call success");
 
                 Ok(Some(block))
             })

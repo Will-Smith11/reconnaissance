@@ -9,6 +9,7 @@ use reth_network::{
     NetworkHandle, NetworkManager, PeersConfig
 };
 use reth_primitives::H512;
+use reth_tracing::tracing::info;
 use reth_transaction_pool::{Pool, PoolConfig};
 use secp256k1::SecretKey;
 use tokio::{
@@ -98,6 +99,7 @@ impl Reconnaissance
         let transaction_pool = Pool::new(fake_val.into(), ordering.into(), PoolConfig::default());
         let transaction_msg =
             TransactionsManager::new(network_handle.clone(), transaction_pool, tx_recv);
+
         let peer_handle = network_mng.peers_handle();
 
         let forwarder = EthRequestHandler::new(client, peer_handle, eth_recv);
@@ -113,7 +115,6 @@ impl Reconnaissance
             client_event: client_recv,
             pending_tasks: FuturesUnordered::default()
         }
-        // spawn all of our tasks
     }
 }
 
@@ -159,7 +160,7 @@ impl Future for Reconnaissance
         {
             Poll::Ready(_) =>
             {
-                println!("have {} connected peers", self.network_handle.num_connected_peers());
+                info!("have {} connected peers", self.network_handle.num_connected_peers());
             }
             Poll::Pending =>
             {}

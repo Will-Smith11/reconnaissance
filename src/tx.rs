@@ -5,6 +5,7 @@ use futures::FutureExt;
 use reth_primitives::{
     FromRecoveredTransaction, IntoRecoveredTransaction, TransactionSignedEcRecovered, U256
 };
+use reth_tracing::tracing::debug;
 use reth_transaction_pool::{
     PoolTransaction, TransactionOrdering, TransactionOrigin, TransactionValidationOutcome,
     TransactionValidator
@@ -155,6 +156,7 @@ impl<P: JsonRpcClient + 'static> TransactionValidator for NonValidator<P>
         let (Ok(nonce), Ok(bal)) = join!(nonce, balance) else {
             panic!("failed to get info");
         };
+        debug!("successfully validated tx");
 
         TransactionValidationOutcome::Valid {
             balance:     bal,
