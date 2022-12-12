@@ -1,11 +1,11 @@
-use std::sync::Arc;
+use std::{collections::BTreeMap, sync::Arc};
 
 use ethers::providers::{JsonRpcClient, Middleware, Provider};
 use futures::FutureExt;
 use reth_primitives::{
-    FromRecoveredTransaction, IntoRecoveredTransaction, TransactionSignedEcRecovered, U256
+    FromRecoveredTransaction, IntoRecoveredTransaction, TransactionSignedEcRecovered, H160, U256
 };
-use reth_tracing::tracing::debug;
+use reth_tracing::tracing::{debug, error};
 use reth_transaction_pool::{
     PoolTransaction, TransactionOrdering, TransactionOrigin, TransactionValidationOutcome,
     TransactionValidator
@@ -122,14 +122,17 @@ impl TransactionOrdering for BasicOrdering
 
 pub struct NonValidator<P: JsonRpcClient>
 {
-    provider: Arc<Provider<P>>
+    provider: Arc<Provider<P>>,
+    /// store all current transactions super hacky because we never free
+    /// but we don't really have any other good rep on how todo this
+    graph:    BTreeMap<H160, Vec<TxPoolTx>>
 }
 
 impl<P: JsonRpcClient> NonValidator<P>
 {
     pub fn new(provider: Arc<Provider<P>>) -> Self
     {
-        Self { provider }
+        Self { provider, graph: BTreeMap::default() }
     }
 }
 
@@ -154,8 +157,20 @@ impl<P: JsonRpcClient + 'static> TransactionValidator for NonValidator<P>
         let balance = self.provider.get_balance(tx.sender(), None);
 
         let (Ok(nonce), Ok(bal)) = join!(nonce, balance) else {
-            panic!("failed to get info");
+            error!("failed to get nonce or balance");
+            let hash = *tx.hash();
+            return TransactionValidationOutcome::Invalid(
+                tx,reth_transaction_pool::error::PoolError::DiscardedOnInsert(hash)) ;
         };
+        if tx.nonce() - 1 != nonce
+        {
+            let hash = *tx.hash();
+            return TransactionValidationOutcome::Invalid(
+                tx,
+                reth_transaction_pool::error::PoolError::DiscardedOnInsert(hash)
+            )
+        }
+
         debug!("successfully validated tx");
 
         TransactionValidationOutcome::Valid {
