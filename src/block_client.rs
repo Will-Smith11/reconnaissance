@@ -45,7 +45,7 @@ impl<T> Cycler<T>
     }
 }
 
-/// very jank because we are trying todo async over sink  
+/// very jank because we are trying todo async over sync  
 pub struct BlockClient<P: JsonRpcClient>
 {
     // different clients to delegate calls to

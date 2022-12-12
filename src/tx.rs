@@ -1,9 +1,9 @@
-use std::{collections::BTreeMap, sync::Arc};
+use std::sync::Arc;
 
 use ethers::providers::{JsonRpcClient, Middleware, Provider};
 use futures::FutureExt;
 use reth_primitives::{
-    FromRecoveredTransaction, IntoRecoveredTransaction, TransactionSignedEcRecovered, H160, U256
+    FromRecoveredTransaction, IntoRecoveredTransaction, TransactionSignedEcRecovered, U256
 };
 use reth_tracing::tracing::{debug, error};
 use reth_transaction_pool::{
@@ -122,23 +122,22 @@ impl TransactionOrdering for BasicOrdering
 
 pub struct NonValidator<P: JsonRpcClient>
 {
-    provider: Arc<Provider<P>>,
-    /// store all current transactions super hacky because we never free
-    /// but we don't really have any other good rep on how todo this
-    graph:    BTreeMap<H160, Vec<TxPoolTx>>
+    provider: Arc<Provider<P>>
 }
 
 impl<P: JsonRpcClient> NonValidator<P>
 {
     pub fn new(provider: Arc<Provider<P>>) -> Self
     {
-        Self { provider, graph: BTreeMap::default() }
+        Self { provider }
     }
 }
 
 #[async_trait::async_trait]
 /// reth verifies the signature of the transaction for us so we will always know
-/// that it is a valid transaction
+/// that it is a valid transaction.. NOTE: because of the transaction pool not
+/// being fully implemented on reth. there are a bunch of errors that can come
+/// up
 impl<P: JsonRpcClient + 'static> TransactionValidator for NonValidator<P>
 {
     type Transaction = TxPoolTx;
@@ -162,6 +161,7 @@ impl<P: JsonRpcClient + 'static> TransactionValidator for NonValidator<P>
             return TransactionValidationOutcome::Invalid(
                 tx,reth_transaction_pool::error::PoolError::DiscardedOnInsert(hash)) ;
         };
+
         if tx.nonce() - 1 != nonce
         {
             let hash = *tx.hash();
