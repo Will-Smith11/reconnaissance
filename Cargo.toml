@@ -6,14 +6,14 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-reth-network = {git = "https://github.com/Will-Smith11/reth.git"}
-reth-transaction-pool = {git = "https://github.com/Will-Smith11/reth.git"}
-reth-primitives = {git = "https://github.com/Will-Smith11/reth.git"}
-reth-provider = {git = "https://github.com/Will-Smith11/reth.git"}
-reth-interfaces = {git = "https://github.com/Will-Smith11/reth.git"}
-reth-eth-wire = {git = "https://github.com/Will-Smith11/reth.git"}
-reth-discv4 = {git = "https://github.com/Will-Smith11/reth.git"}
-reth-tracing = {git = "https://github.com/Will-Smith11/reth.git"}
+reth-network = {git = "https://github.com/paradigmxyz/reth.git"}
+reth-transaction-pool = {git = "https://github.com/paradigmxyz/reth.git"}
+reth-primitives = {git = "https://github.com/paradigmxyz/reth.git"}
+reth-provider = {git = "https://github.com/paradigmxyz/reth.git"}
+reth-interfaces = {git = "https://github.com/paradigmxyz/reth.git"}
+reth-eth-wire = {git = "https://github.com/paradigmxyz/reth.git"}
+reth-discv4 = {git = "https://github.com/paradigmxyz/reth.git"}
+reth-tracing = {git = "https://github.com/paradigmxyz/reth.git"}
 ethers =  { git = "https://github.com/gakonst/ethers-rs"}
 
 tokio = {version = "1.23.0", features = ["full"]}

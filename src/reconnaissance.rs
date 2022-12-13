@@ -140,7 +140,7 @@ impl Future for Reconnaissance
                         let new_network_handle = self.network_handle.clone();
                         let task = tokio::task::spawn(async move {
                             let client = new_network_handle.fetch_client().await.unwrap();
-                            let res = client.get_block_body(req).await;
+                            let res = client.get_block_body(req).await.map(|res| res.1);
                             channel.send(res).unwrap();
                         });
 
