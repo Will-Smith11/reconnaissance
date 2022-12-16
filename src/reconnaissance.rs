@@ -73,8 +73,6 @@ impl Reconnaissance
         let peer_config = PeersConfig::default()
             .with_max_inbound(100)
             .with_max_outbound(100)
-            .with_max_pending_inbound(5)
-            .with_max_pending_outbound(5)
             .with_slot_refill_interval(Duration::from_millis(200));
 
         let secret_key = SecretKey::new(&mut rand::thread_rng());
@@ -101,13 +99,12 @@ impl Reconnaissance
             TransactionsManager::new(network_handle.clone(), transaction_pool, tx_recv);
 
         let peer_handle = network_mng.peers_handle();
-
         let forwarder = EthRequestHandler::new(client, peer_handle, eth_recv);
 
         let network_task = tokio::spawn(async move { network_mng.await });
         let transaction_task = tokio::spawn(async move { transaction_msg.await });
-
         let eth_req_handler = tokio::spawn(async move { forwarder.await });
+
         Self {
             handles: vec![network_task, transaction_task, eth_req_handler],
             network_handle,
@@ -140,7 +137,7 @@ impl Future for Reconnaissance
                         let new_network_handle = self.network_handle.clone();
                         let task = tokio::task::spawn(async move {
                             let client = new_network_handle.fetch_client().await.unwrap();
-                            let res = client.get_block_body(req).await.map(|res| res.1);
+                            let res = client.get_block_bodies(req).await.map(|res| res.1);
                             channel.send(res).unwrap();
                         });
 

@@ -72,9 +72,7 @@ impl<P: JsonRpcClient> BlockClient<P>
     ) -> reth_interfaces::Result<Option<ethers::types::Block<TxHash>>>
     {
         self.provider.get().get_block(id).await.map_err(|_| {
-            reth_interfaces::Error::Provider(reth_provider::Error::BlockNumberNotExists {
-                block_number: 0
-            })
+            reth_interfaces::Error::Provider(reth_provider::Error::BlockNumber { block_number: 0 })
         })
     }
 
@@ -148,7 +146,7 @@ impl<P: JsonRpcClient> BlockProvider for BlockClient<P>
         tokio::task::block_in_place(|| {
             Handle::current().block_on(async {
                 let block = self.get_block(id).await?.ok_or_else(|| {
-                    reth_interfaces::Error::Provider(reth_provider::Error::BlockNumberNotExists {
+                    reth_interfaces::Error::Provider(reth_provider::Error::BlockNumber {
                         block_number: 0
                     })
                 })?;
@@ -158,14 +156,14 @@ impl<P: JsonRpcClient> BlockProvider for BlockClient<P>
                     .unwrap();
 
                 let mut body = recv.await.unwrap().map_err(|_| {
-                    reth_interfaces::Error::Provider(reth_provider::Error::BlockNumberNotExists {
+                    reth_interfaces::Error::Provider(reth_provider::Error::BlockNumber {
                         block_number: 0
                     })
                 })?;
                 if body.is_empty()
                 {
                     return Err(reth_interfaces::Error::Provider(
-                        reth_provider::Error::BlockNumberNotExists { block_number: 0 }
+                        reth_provider::Error::BlockNumber { block_number: 0 }
                     ))
                 }
                 let res = body.remove(0);
@@ -191,9 +189,7 @@ impl<P: JsonRpcClient> BlockProvider for BlockClient<P>
         })
         .map(|block| block.map(|block_inner| block_inner.number.unwrap().as_u64()))
         .map_err(|_| {
-            reth_interfaces::Error::Provider(reth_provider::Error::BlockHashNotExist {
-                block_hash: hash
-            })
+            reth_interfaces::Error::Provider(reth_provider::Error::BlockHash { block_hash: hash })
         })
     }
 
@@ -212,7 +208,7 @@ impl<P: JsonRpcClient> BlockProvider for BlockClient<P>
         })
         .map(|block| block.map(|block_inner| block_inner.hash.unwrap()))
         .map_err(|_| {
-            reth_interfaces::Error::Provider(reth_provider::Error::BlockNumberNotExists {
+            reth_interfaces::Error::Provider(reth_provider::Error::BlockNumber {
                 block_number: number.as_u64()
             })
         })
@@ -232,9 +228,9 @@ impl<P: JsonRpcClient> HeaderProvider for BlockClient<P>
                     self.get_block(BlockId::Hash(*block_hash))
                         .await?
                         .ok_or_else(|| {
-                            reth_interfaces::Error::Provider(
-                                reth_provider::Error::BlockNumberNotExists { block_number: 0 }
-                            )
+                            reth_interfaces::Error::Provider(reth_provider::Error::BlockNumber {
+                                block_number: 0
+                            })
                         })?
                 )
                 .map(Some)
@@ -251,9 +247,9 @@ impl<P: JsonRpcClient> HeaderProvider for BlockClient<P>
                     self.get_block(BlockId::Number(BlockNumber::Number(num.into())))
                         .await?
                         .ok_or_else(|| {
-                            reth_interfaces::Error::Provider(
-                                reth_provider::Error::BlockNumberNotExists { block_number: 0 }
-                            )
+                            reth_interfaces::Error::Provider(reth_provider::Error::BlockNumber {
+                                block_number: 0
+                            })
                         })?
                 )
                 .map(Some)
