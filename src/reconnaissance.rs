@@ -1,4 +1,4 @@
-use std::{str::FromStr, sync::Arc, task::Poll, time::Duration};
+use std::{net::SocketAddr, str::FromStr, sync::Arc, task::Poll, time::Duration};
 
 use ethers::providers::{Http, Provider};
 use futures::{stream::FuturesUnordered, Future, FutureExt, StreamExt};
@@ -75,10 +75,14 @@ impl Reconnaissance
             .with_max_outbound(100)
             .with_slot_refill_interval(Duration::from_millis(200));
 
+        let disc = SocketAddr::new([0, 0, 0, 0].into(), 30000);
+        let reg = SocketAddr::new([0, 0, 0, 0].into(), 30107);
         let secret_key = SecretKey::new(&mut rand::thread_rng());
         let network_config = NetworkConfig::builder(client.clone(), secret_key)
             .boot_nodes(get_boot_nodes())
             .peer_config(peer_config)
+            .listener_addr(reg)
+            .discovery_addr(disc)
             .build();
 
         let mut network_mng = NetworkManager::new(network_config).await.unwrap();

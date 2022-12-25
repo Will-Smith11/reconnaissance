@@ -256,4 +256,21 @@ impl<P: JsonRpcClient> HeaderProvider for BlockClient<P>
             })
         })
     }
+
+    fn header_td(
+        &self,
+        hash: &reth_primitives::BlockHash
+    ) -> reth_interfaces::Result<Option<reth_primitives::U256>>
+    {
+        tokio::task::block_in_place(move || {
+            Handle::current().block_on(async {
+                let block = self.get_block(BlockId::Hash(*hash)).await?.ok_or_else(|| {
+                    reth_interfaces::Error::Provider(reth_provider::Error::BlockHash {
+                        block_hash: *hash
+                    })
+                })?;
+                Ok(Some(block.difficulty))
+            })
+        })
+    }
 }
