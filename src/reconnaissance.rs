@@ -72,8 +72,7 @@ impl Reconnaissance
 
         let peer_config = PeersConfig::default()
             .with_max_inbound(100)
-            .with_max_outbound(100)
-            .with_slot_refill_interval(Duration::from_millis(200));
+            .with_max_outbound(100);
 
         let disc = SocketAddr::new([0, 0, 0, 0].into(), 30000);
         let reg = SocketAddr::new([0, 0, 0, 0].into(), 30107);

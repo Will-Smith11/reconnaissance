@@ -2,12 +2,12 @@ use std::sync::{atomic::AtomicUsize, Arc};
 
 use ethers::{
     providers::{JsonRpcClient, Middleware, Provider},
-    types::{BlockId, BlockNumber}
+    types::{BlockId, BlockNumber, H256 as EH256}
 };
 use reth_eth_wire::BlockBody;
 use reth_interfaces::p2p::error::RequestResult;
-use reth_primitives::{Header, TxHash, H256};
-use reth_provider::{BlockProvider, ChainInfo, HeaderProvider};
+use reth_primitives::{Header, H256};
+use reth_provider::{BlockHashProvider, BlockProvider, ChainInfo, HeaderProvider};
 use reth_tracing::tracing::debug;
 use tokio::{
     join,
@@ -69,32 +69,56 @@ impl<P: JsonRpcClient> BlockClient<P>
     async fn get_block(
         &self,
         id: BlockId
-    ) -> reth_interfaces::Result<Option<ethers::types::Block<TxHash>>>
+    ) -> reth_interfaces::Result<Option<ethers::types::Block<EH256>>>
     {
         self.provider.get().get_block(id).await.map_err(|_| {
             reth_interfaces::Error::Provider(reth_provider::Error::BlockNumber { block_number: 0 })
         })
     }
 
-    fn build_header(&self, block: ethers::types::Block<TxHash>) -> reth_interfaces::Result<Header>
+    fn build_header(&self, block: ethers::types::Block<EH256>) -> reth_interfaces::Result<Header>
     {
         Ok(Header {
-            parent_hash:       block.parent_hash,
-            ommers_hash:       block.uncles_hash,
-            beneficiary:       block.author.unwrap(),
-            state_root:        block.state_root,
-            transactions_root: block.transactions_root,
-            receipts_root:     block.receipts_root,
-            logs_bloom:        block.logs_bloom.unwrap(),
-            difficulty:        block.difficulty,
+            parent_hash:       block.parent_hash.0.into(),
+            ommers_hash:       block.uncles_hash.0.into(),
+            beneficiary:       block.author.unwrap().0.into(),
+            state_root:        block.state_root.0.into(),
+            transactions_root: block.transactions_root.0.into(),
+            receipts_root:     block.receipts_root.0.into(),
+            logs_bloom:        block.logs_bloom.unwrap().0.into(),
+            difficulty:        block.difficulty.into(),
             number:            block.number.unwrap().as_u64(),
             gas_limit:         block.gas_limit.as_u64(),
             gas_used:          block.gas_used.as_u64(),
             timestamp:         block.timestamp.as_u64(),
-            mix_hash:          block.mix_hash.unwrap(),
+            mix_hash:          block.mix_hash.unwrap().0.into(),
             nonce:             block.nonce.unwrap().to_low_u64_be(),
             base_fee_per_gas:  block.base_fee_per_gas.map(|i| i.as_u64()),
             extra_data:        block.extra_data.0
+        })
+    }
+}
+
+impl<P: JsonRpcClient> BlockHashProvider for BlockClient<P>
+{
+    fn block_hash(
+        &self,
+        number: reth_primitives::U256
+    ) -> reth_interfaces::Result<Option<reth_primitives::H256>>
+    {
+        tokio::task::block_in_place(|| {
+            Handle::current().block_on(async {
+                self.provider
+                    .get()
+                    .get_block(BlockId::Number(BlockNumber::Number(number.to::<u64>().into())))
+                    .await
+            })
+        })
+        .map(|block| block.map(|block_inner| block_inner.hash.unwrap().0.into()))
+        .map_err(|_| {
+            reth_interfaces::Error::Provider(reth_provider::Error::BlockNumber {
+                block_number: number.to::<u64>()
+            })
         })
     }
 }
@@ -129,7 +153,7 @@ impl<P: JsonRpcClient> BlockProvider for BlockClient<P>
                 let finalized_block = finalized.map_err(take_err)?.ok_or_else(err)?;
                 debug!("chain info call success");
                 Ok(ChainInfo {
-                    best_hash:      latest_block.hash.unwrap(),
+                    best_hash:      latest_block.hash.unwrap().0.into(),
                     best_number:    latest_block.number.unwrap().as_u64(),
                     last_finalized: finalized_block.number.map(|e| e.as_u64()),
                     safe_finalized: safe_block.number.map(|e| e.as_u64())
@@ -152,7 +176,7 @@ impl<P: JsonRpcClient> BlockProvider for BlockClient<P>
                 })?;
                 let (send, recv) = tokio::sync::oneshot::channel();
                 self.fetcher
-                    .send(FetcherReq::BlockBodyReq((send, vec![block.hash.unwrap()])))
+                    .send(FetcherReq::BlockBodyReq((send, vec![block.hash.unwrap().0.into()])))
                     .unwrap();
 
                 let mut body = recv.await.unwrap().map_err(|_| {
@@ -184,33 +208,16 @@ impl<P: JsonRpcClient> BlockProvider for BlockClient<P>
     ) -> reth_interfaces::Result<Option<reth_primitives::BlockNumber>>
     {
         tokio::task::block_in_place(|| {
-            Handle::current()
-                .block_on(async { self.provider.get().get_block(BlockId::Hash(hash)).await })
+            Handle::current().block_on(async {
+                self.provider
+                    .get()
+                    .get_block(BlockId::Hash(hash.0.into()))
+                    .await
+            })
         })
         .map(|block| block.map(|block_inner| block_inner.number.unwrap().as_u64()))
         .map_err(|_| {
             reth_interfaces::Error::Provider(reth_provider::Error::BlockHash { block_hash: hash })
-        })
-    }
-
-    fn block_hash(
-        &self,
-        number: reth_primitives::U256
-    ) -> reth_interfaces::Result<Option<reth_primitives::H256>>
-    {
-        tokio::task::block_in_place(|| {
-            Handle::current().block_on(async {
-                self.provider
-                    .get()
-                    .get_block(BlockId::Number(BlockNumber::Number(number.as_u64().into())))
-                    .await
-            })
-        })
-        .map(|block| block.map(|block_inner| block_inner.hash.unwrap()))
-        .map_err(|_| {
-            reth_interfaces::Error::Provider(reth_provider::Error::BlockNumber {
-                block_number: number.as_u64()
-            })
         })
     }
 }
@@ -225,7 +232,7 @@ impl<P: JsonRpcClient> HeaderProvider for BlockClient<P>
         tokio::task::block_in_place(|| {
             Handle::current().block_on(async {
                 self.build_header(
-                    self.get_block(BlockId::Hash(*block_hash))
+                    self.get_block(BlockId::Hash(block_hash.0.into()))
                         .await?
                         .ok_or_else(|| {
                             reth_interfaces::Error::Provider(reth_provider::Error::BlockNumber {
@@ -264,12 +271,15 @@ impl<P: JsonRpcClient> HeaderProvider for BlockClient<P>
     {
         tokio::task::block_in_place(move || {
             Handle::current().block_on(async {
-                let block = self.get_block(BlockId::Hash(*hash)).await?.ok_or_else(|| {
-                    reth_interfaces::Error::Provider(reth_provider::Error::BlockHash {
-                        block_hash: *hash
-                    })
-                })?;
-                Ok(Some(block.difficulty))
+                let block = self
+                    .get_block(BlockId::Hash(hash.0.into()))
+                    .await?
+                    .ok_or_else(|| {
+                        reth_interfaces::Error::Provider(reth_provider::Error::BlockHash {
+                            block_hash: *hash
+                        })
+                    })?;
+                Ok(Some(block.difficulty.into()))
             })
         })
     }

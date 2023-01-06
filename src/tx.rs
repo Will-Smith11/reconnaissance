@@ -74,9 +74,9 @@ impl PoolTransaction for TxPoolTx
     {
         match &self.inner.transaction
         {
-            reth_primitives::Transaction::Legacy(t) => t.gas_price.into(),
-            reth_primitives::Transaction::Eip2930(t) => t.gas_price.into(),
-            reth_primitives::Transaction::Eip1559(t) => t.max_fee_per_gas.into()
+            reth_primitives::Transaction::Legacy(t) => U256::from(t.gas_price),
+            reth_primitives::Transaction::Eip2930(t) => U256::from(t.gas_price),
+            reth_primitives::Transaction::Eip1559(t) => U256::from(t.max_fee_per_gas)
         }
     }
 
@@ -89,7 +89,7 @@ impl PoolTransaction for TxPoolTx
     {
         match &self.inner.transaction
         {
-            reth_primitives::Transaction::Eip1559(t) => Some(t.max_fee_per_gas.into()),
+            reth_primitives::Transaction::Eip1559(t) => Some(U256::from(t.max_fee_per_gas)),
             _ => None
         }
     }
@@ -98,7 +98,10 @@ impl PoolTransaction for TxPoolTx
     {
         match &self.inner.transaction
         {
-            reth_primitives::Transaction::Eip1559(t) => Some(t.max_priority_fee_per_gas.into()),
+            reth_primitives::Transaction::Eip1559(t) =>
+            {
+                Some(U256::from(t.max_priority_fee_per_gas))
+            }
             _ => None
         }
     }
@@ -151,9 +154,14 @@ impl<P: JsonRpcClient + 'static> TransactionValidator for NonValidator<P>
         // get sender nonce
         let nonce = self
             .provider
-            .get_transaction_count(tx.sender(), None)
+            .get_transaction_count(
+                ethers::types::NameOrAddress::Address(tx.sender().0.into()),
+                None
+            )
             .map(|f| f.map(|t| t.as_u64()));
-        let balance = self.provider.get_balance(tx.sender(), None);
+        let balance = self
+            .provider
+            .get_balance(ethers::types::NameOrAddress::Address(tx.sender().0.into()), None);
 
         let (Ok(nonce), Ok(bal)) = join!(nonce, balance) else {
             error!("failed to get nonce or balance");
@@ -162,7 +170,7 @@ impl<P: JsonRpcClient + 'static> TransactionValidator for NonValidator<P>
                 tx,reth_transaction_pool::error::PoolError::DiscardedOnInsert(hash)) ;
         };
 
-        if tx.nonce() - 1 != nonce
+        if tx.nonce() != nonce
         {
             let hash = *tx.hash();
             return TransactionValidationOutcome::Invalid(
@@ -174,7 +182,7 @@ impl<P: JsonRpcClient + 'static> TransactionValidator for NonValidator<P>
         debug!("successfully validated tx");
 
         TransactionValidationOutcome::Valid {
-            balance:     bal,
+            balance:     bal.into(),
             state_nonce: nonce,
             transaction: tx
         }
