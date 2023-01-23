@@ -6,17 +6,18 @@ edition = "2021"
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-reth-network = {git = "https://github.com/paradigmxyz/reth.git"}
-reth-transaction-pool = {git = "https://github.com/paradigmxyz/reth.git"}
-reth-primitives = {git = "https://github.com/paradigmxyz/reth.git"}
-reth-provider = {git = "https://github.com/paradigmxyz/reth.git"}
-reth-interfaces = {git = "https://github.com/paradigmxyz/reth.git"}
-reth-eth-wire = {git = "https://github.com/paradigmxyz/reth.git"}
-reth-discv4 = {git = "https://github.com/paradigmxyz/reth.git"}
-reth-tracing = {git = "https://github.com/paradigmxyz/reth.git"}
-ethers =  { git = "https://github.com/gakonst/ethers-rs"}
+reth-network = { git = "https://github.com/paradigmxyz/reth.git" }
+reth-network-api = { git = "https://github.com/paradigmxyz/reth.git" }
+reth-transaction-pool = { git = "https://github.com/paradigmxyz/reth.git" }
+reth-primitives = { git = "https://github.com/paradigmxyz/reth.git" }
+reth-provider = { git = "https://github.com/paradigmxyz/reth.git" }
+reth-interfaces = { git = "https://github.com/paradigmxyz/reth.git" }
+reth-eth-wire = { git = "https://github.com/paradigmxyz/reth.git" }
+reth-discv4 = { git = "https://github.com/paradigmxyz/reth.git" }
+reth-tracing = { git = "https://github.com/paradigmxyz/reth.git" }
+ethers = { git = "https://github.com/gakonst/ethers-rs" }
 
-tokio = {version = "1.23.0", features = ["full"]}
+tokio = { version = "1.23.0", features = ["full"] }
 futures = "0.3.25"
 secp256k1 = { version = "0.24", features = [
     "global-context",
@@ -25,3 +26,5 @@ secp256k1 = { version = "0.24", features = [
 ] }
 rand = "0.8"
 async-trait = "0.1.59"
+fdlimit = "0.2.1"
+

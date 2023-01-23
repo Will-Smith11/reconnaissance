@@ -8,6 +8,7 @@ use reth_network::{
     eth_requests::EthRequestHandler, transactions::TransactionsManager, NetworkConfig,
     NetworkHandle, NetworkManager, PeersConfig
 };
+use reth_network_api::PeersInfo;
 use reth_primitives::H512;
 use reth_tracing::tracing::info;
 use reth_transaction_pool::{Pool, PoolConfig};
@@ -77,12 +78,12 @@ impl Reconnaissance
         let disc = SocketAddr::new([0, 0, 0, 0].into(), 30000);
         let reg = SocketAddr::new([0, 0, 0, 0].into(), 30107);
         let secret_key = SecretKey::new(&mut rand::thread_rng());
-        let network_config = NetworkConfig::builder(client.clone(), secret_key)
+        let network_config = NetworkConfig::<Arc<BlockClient<Http>>>::builder(secret_key)
             .boot_nodes(get_boot_nodes())
             .peer_config(peer_config)
             .listener_addr(reg)
             .discovery_addr(disc)
-            .build();
+            .build(client.clone());
 
         let mut network_mng = NetworkManager::new(network_config).await.unwrap();
 
