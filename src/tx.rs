@@ -163,11 +163,15 @@ impl<P: JsonRpcClient + 'static> TransactionValidator for NonValidator<P>
             .provider
             .get_balance(ethers::types::NameOrAddress::Address(tx.sender().0.into()), None);
 
-        let (Ok(nonce), Ok(bal)) = join!(nonce, balance) else {
+        let (Ok(nonce), Ok(bal)) = join!(nonce, balance)
+        else
+        {
             error!("failed to get nonce or balance");
             let hash = *tx.hash();
             return TransactionValidationOutcome::Invalid(
-                tx,reth_transaction_pool::error::PoolError::DiscardedOnInsert(hash)) ;
+                tx,
+                reth_transaction_pool::error::PoolError::DiscardedOnInsert(hash)
+            )
         };
 
         if tx.nonce() != nonce

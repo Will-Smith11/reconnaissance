@@ -4,7 +4,7 @@ use reconnaissance::reconnaissance::Reconnaissance;
 async fn main()
 {
     fdlimit::raise_fd_limit();
-    reth_tracing::init_test_tracing();
+    reth_tracing::init_tracing();
     let reconnaissance = Reconnaissance::new().await;
     reconnaissance.await
 }

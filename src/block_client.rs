@@ -94,7 +94,7 @@ impl<P: JsonRpcClient> BlockClient<P>
             mix_hash:          block.mix_hash.unwrap().0.into(),
             nonce:             block.nonce.unwrap().to_low_u64_be(),
             base_fee_per_gas:  block.base_fee_per_gas.map(|i| i.as_u64()),
-            extra_data:        reth_primitives::Bytes(block.extra_data.0)
+            extra_data:        block.extra_data.0
         })
     }
 }
